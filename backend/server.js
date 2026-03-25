@@ -9,6 +9,9 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
+const graphRoutes = require("./routes/graphRoutes");
+app.use("/graph", graphRoutes);
+
 app.get("/", (req, res) => {
   res.send("🚀 Graph AI System Running");
 });
