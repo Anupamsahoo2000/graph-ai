@@ -49,7 +49,7 @@ const getJsonlFiles = (dirName) => {
 const run = async () => {
   try {
     // Use force: true to ensure any corrupted constraints are wiped out
-    await sequelize.sync({ force: true });
+    await sequelize.sync({ alter: true });
 
     console.log("🚀 Starting transformation...");
 
