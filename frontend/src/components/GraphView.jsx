@@ -135,7 +135,8 @@ const GraphView = ({ chatContextText = "" }) => {
   useEffect(() => {
     const fetchGraph = async () => {
       try {
-        const res = await axios.get("http://localhost:5000/graph");
+        const API_URL = import.meta.env.VITE_API_URL || "http://localhost:5000";
+        const res = await axios.get(`${API_URL}/graph`);
 
         // Convert backend format → React Flow custom node format
         const rawNodes = res.data.nodes.map((n) => ({
