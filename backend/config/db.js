@@ -2,7 +2,6 @@ const { Sequelize } = require("sequelize");
 const path = require("path");
 const dotenv = require("dotenv");
 
-// Ensure env vars are loaded from `backend/.env` regardless of the CWD.
 const envPath = path.join(__dirname, "..", ".env");
 dotenv.config({ path: envPath });
 

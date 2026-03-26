@@ -22,6 +22,7 @@ const buildGraph = async () => {
       id: `customer_${c.id}`,
       label: `Customer ${c.id}`,
       type: "customer",
+      name: c.name,
     });
   });
 
@@ -35,6 +36,7 @@ const buildGraph = async () => {
       id: `product_${p.id}`,
       label: `Product ${p.id}`,
       type: "product",
+      name: p.name,
     });
   });
 

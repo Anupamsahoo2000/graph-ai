@@ -26,7 +26,11 @@ const readJSONL = async (...filePaths) => {
 
     for await (const line of rl) {
       if (line.trim()) {
-        data.push(JSON.parse(line));
+        try {
+          data.push(JSON.parse(line));
+        } catch (e) {
+          // Ignore parse errors on bad lines
+        }
       }
     }
   }
@@ -34,21 +38,25 @@ const readJSONL = async (...filePaths) => {
   return data;
 };
 
+const getJsonlFiles = (dirName) => {
+  const fullDir = path.join(__dirname, "../data", dirName);
+  if (!fs.existsSync(fullDir)) return [];
+  return fs.readdirSync(fullDir)
+    .filter(f => f.endsWith(".jsonl"))
+    .map(f => path.join(fullDir, f));
+};
+
 const run = async () => {
   try {
-    // Avoid `alter: true` because it can try to drop/recreate constraints
-    // inconsistently and fail when the constraint name differs from what
-    // Sequelize expects.
-    await sequelize.sync();
+    // Use force: true to ensure any corrupted constraints are wiped out
+    await sequelize.sync({ force: true });
 
     console.log("🚀 Starting transformation...");
 
     // -----------------------------
     // 1. CUSTOMERS
     // -----------------------------
-    const customersRaw = await readJSONL(
-      path.join(__dirname, "../data/business_partner.jsonl"),
-    );
+    const customersRaw = await readJSONL(...getJsonlFiles("business_partners"));
 
     for (const c of customersRaw) {
       const id = c.business_partner ?? c.businessPartner ?? c.customer;
@@ -71,16 +79,21 @@ const run = async () => {
     // -----------------------------
     // 2. PRODUCTS
     // -----------------------------
-    const productsRaw = await readJSONL(
-      path.join(__dirname, "../data/products1.jsonl"),
-      path.join(__dirname, "../data/products2.jsonl"),
-    );
+    const productsRaw = await readJSONL(...getJsonlFiles("products"));
+
+    const pdRaw = await readJSONL(...getJsonlFiles("product_descriptions"));
+    const productNameMap = {};
+    for (const item of pdRaw) {
+      if (item.product && item.productDescription) {
+        productNameMap[item.product] = item.productDescription;
+      }
+    }
 
     for (const p of productsRaw) {
       await Product.findOrCreate({
         where: { id: p.product },
         defaults: {
-          name: p.product_description || "Unknown",
+          name: productNameMap[p.product] || p.product_description || "Unknown",
         },
       });
     }
@@ -90,9 +103,7 @@ const run = async () => {
     // -----------------------------
     // 3. ORDERS
     // -----------------------------
-    const ordersRaw = await readJSONL(
-      path.join(__dirname, "../data/sales_order_headers.jsonl"),
-    );
+    const ordersRaw = await readJSONL(...getJsonlFiles("sales_order_headers"));
 
     for (const o of ordersRaw) {
       const id = o.sales_order ?? o.salesOrder;
@@ -111,10 +122,7 @@ const run = async () => {
     // -----------------------------
     // 4. ORDER ITEMS
     // -----------------------------
-    const itemsRaw = await readJSONL(
-      path.join(__dirname, "../data/sales_order_items1.jsonl"),
-      path.join(__dirname, "../data/sales_order_items2.jsonl"),
-    );
+    const itemsRaw = await readJSONL(...getJsonlFiles("sales_order_items"));
 
     for (const item of itemsRaw) {
       const orderId = item.sales_order ?? item.salesOrder;
@@ -150,9 +158,15 @@ const run = async () => {
     // -----------------------------
     // 5. DELIVERIES
     // -----------------------------
-    const deliveriesRaw = await readJSONL(
-      path.join(__dirname, "../data/outbound_delivery_headers.jsonl"),
-    );
+    const deliveriesRaw = await readJSONL(...getJsonlFiles("outbound_delivery_headers"));
+
+    const odiRaw = await readJSONL(...getJsonlFiles("outbound_delivery_items"));
+    const deliveryOrderMap = {};
+    for (const item of odiRaw) {
+      if (item.deliveryDocument && item.referenceSdDocument) {
+        deliveryOrderMap[item.deliveryDocument] = item.referenceSdDocument;
+      }
+    }
 
     for (const d of deliveriesRaw) {
       const id = d.outbound_delivery ?? d.outboundDelivery ?? d.deliveryDocument;
@@ -165,6 +179,7 @@ const run = async () => {
             d.reference_sales_order ??
             d.referenceSalesOrder ??
             d.salesOrder ??
+            deliveryOrderMap[id] ??
             null,
         },
       });
@@ -175,25 +190,47 @@ const run = async () => {
     // -----------------------------
     // 6. INVOICES
     // -----------------------------
-    const invoicesRaw = await readJSONL(
-      path.join(__dirname, "../data/billing_document_headers1.jsonl"),
-      path.join(__dirname, "../data/billing_document_headers2.jsonl"),
-    );
+    const invoicesRaw = await readJSONL(...getJsonlFiles("billing_document_headers"));
+
+    // Get all valid delivery IDs from DB to prevent FK constraint failures
+    const validDeliveries = new Set((await Delivery.findAll({ attributes: ['id'] })).map(d => d.id));
+
+    // Read items to find delivery map
+    const billingItemsRaw = await readJSONL(...getJsonlFiles("billing_document_items"));
+    
+    // Map: Invoice ID -> Delivery ID (referenceSdDocument)
+    const deliveryMap = {};
+    for (const item of billingItemsRaw) {
+      if (item.billingDocument && item.referenceSdDocument) {
+        deliveryMap[item.billingDocument] = item.referenceSdDocument;
+      }
+    }
 
     for (const inv of invoicesRaw) {
       const id = inv.billing_document ?? inv.billingDocument;
       if (id == null || id === "") continue;
 
-      await Invoice.findOrCreate({
+      let delivery_id =
+        inv.reference_document ??
+        inv.referenceDocument ??
+        inv.deliveryDocument ??
+        deliveryMap[id] ??
+        null;
+        
+      if (delivery_id && !validDeliveries.has(delivery_id)) {
+        delivery_id = null; // Prevent FK failure (e.g. order-related billing instead of delivery-related)
+      }
+
+      const [row, created] = await Invoice.findOrCreate({
         where: { id },
         defaults: {
-          delivery_id:
-            inv.reference_document ??
-            inv.referenceDocument ??
-            inv.deliveryDocument ??
-            null,
+          delivery_id,
         },
       });
+
+      if (!created) {
+        await row.update({ delivery_id });
+      }
     }
 
     console.log("✅ Invoices inserted");
@@ -201,9 +238,16 @@ const run = async () => {
     // -----------------------------
     // 7. PAYMENTS
     // -----------------------------
-    const paymentsRaw = await readJSONL(
-      path.join(__dirname, "../data/payments_accounts_receivable.jsonl"),
-    );
+    const paymentsRaw = await readJSONL(...getJsonlFiles("payments_accounts_receivable"));
+
+    const jeRaw = await readJSONL(...getJsonlFiles("journal_entry_items_accounts_receivable"));
+    const paymentInvoiceMap = {};
+    for (const item of jeRaw) {
+      // payments_accounts_receivable usually references accountingDocument
+      if (item.accountingDocument && item.referenceDocument) {
+        paymentInvoiceMap[item.accountingDocument] = item.referenceDocument;
+      }
+    }
 
     for (const p of paymentsRaw) {
       const id = p.accounting_document ?? p.accountingDocument;
@@ -213,6 +257,7 @@ const run = async () => {
         p.billing_document ??
         p.billingDocument ??
         p.invoiceReference ??
+        paymentInvoiceMap[id] ??
         null;
       const amount = p.amount ?? p.amountInTransactionCurrency ?? 0;
 
