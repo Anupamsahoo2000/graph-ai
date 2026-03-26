@@ -7,11 +7,11 @@ Welcome to the **Context Graph System**! This application takes scattered busine
 
 ### 🚀 Key Features
 * **Visual Data Graph**: See exactly how your business data connects in a real-time, interactive node map.
-* **Dodge AI Chatbot**: Ask natural language questions and get accurate answers instantly.
+* **AI Chatbot**: Ask natural language questions and get accurate answers instantly.
 * **Secure & Smart**: The AI securely translates your English into database queries without ever modifying your raw data.
 * **High Performance**: Built with React 19, Node.js, and supported by a robust PostgreSQL database.
 
-### 💬 What can you ask Dodge AI?
+### 💬 What can you ask AI?
 Not sure where to start? Try asking the AI one of these few example questions:
 1. "How many unique orders exist in the database?"
 2. "Show me all the deliveries linked to Order ID 740520."
