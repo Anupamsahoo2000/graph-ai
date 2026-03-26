@@ -1,20 +1,17 @@
-import express, { json } from "express";
-import cors from "cors";
+const express = require("express");
+const cors = require("cors");
 const app = express();
 require("dotenv").config();
-import { sequelize } from "./config/db";
-import "./models";
+const { sequelize } = require("./config/db");
+require("./models");
+
 app.use(cors());
-app.use(json());
+app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
-import seed from "./scripts/transformAndSeed";
-
-await seed();
-
-import graphRoutes from "./routes/graphRoutes";
-import queryRoutes from "./routes/quaryRoutes";
+const graphRoutes = require("./routes/graphRoutes");
+const queryRoutes = require("./routes/quaryRoutes");
 
 // Routes
 app.use("/graph", graphRoutes);
