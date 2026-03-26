@@ -9,6 +9,10 @@ app.use(express.json());
 
 const PORT = process.env.PORT || 5000;
 
+const seed = require("./scripts/transformAndSeed");
+
+await seed();
+
 const graphRoutes = require("./routes/graphRoutes");
 const queryRoutes = require("./routes/quaryRoutes");
 
