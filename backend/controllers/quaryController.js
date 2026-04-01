@@ -64,7 +64,7 @@ const runQuery = async (question) => {
     return { answer, sql, result };
   } catch (error) {
     return {
-      answer: "Failed to process query. Please try again.",
+      answer: `Failed to process query. Error: ${error.message}. Please try again.`,
       error: error.message,
     };
   }
