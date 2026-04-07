@@ -3,7 +3,7 @@
 Welcome to the **Context Graph System**! This application takes scattered business data (Orders, Deliveries, Invoices, Payments) and turns it into a beautiful, interactive visual map. It also features a built-in AI assistant ("Dodge AI") to answer your questions instantly.
 
 ### 🌟 Live Demo
-[Click here to view the live project!](https://graph-2otspjd7h-anupam-sahoos-projects.vercel.app/)
+[Click here to view the live project!](https://graph-ai-beta.vercel.app/)
 
 ### 🚀 Key Features
 * **Visual Data Graph**: See exactly how your business data connects in a real-time, interactive node map.
